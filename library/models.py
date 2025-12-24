@@ -56,3 +56,7 @@ class Loan(models.Model):
             self.due_date = self.loan_date + timedelta(days=14)
 
         super().save(**kwargs)
+
+    @property
+    def is_overdue(self):
+        return self.due_date < timezone.now().date()

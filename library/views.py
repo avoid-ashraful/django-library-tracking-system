@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from .models import Author, Book, Member, Loan
@@ -52,3 +54,20 @@ class MemberViewSet(viewsets.ModelViewSet):
 class LoanViewSet(viewsets.ModelViewSet):
     queryset = Loan.objects.all()
     serializer_class = LoanSerializer
+
+
+    @action(detail=True, methods=['post'])
+    def extend_due_date(self, request, pk=None):
+        additional_days = request.data.get('additional_days', 0)
+
+        loan = self.get_object()
+        if loan.is_overdue:
+            return Response({'error': 'Loan is alrady overdue.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if additional_days < 1:
+            return Response({'error': 'additional_days is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        loan.due_date += timedelta(days=additional_days)
+        return Response(self.serializer_class(loan), status=status.HTTP_200_OK)
+
+
