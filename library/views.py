@@ -1,9 +1,10 @@
 from datetime import timedelta
 
+from django.db.models import Count, Q
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from .models import Author, Book, Member, Loan
-from .serializers import AuthorSerializer, BookSerializer, MemberSerializer, LoanSerializer
+from .serializers import AuthorSerializer, BookSerializer, MemberSerializer, LoanSerializer, MemberLoanCountSerializer
 from rest_framework.decorators import action
 from django.utils import timezone
 from .tasks import send_loan_notification
@@ -13,8 +14,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
     serializer_class = AuthorSerializer
 
 class BookViewSet(viewsets.ModelViewSet):
-    queryset = Book.objects.all()
+    queryset = Book.objects.select_related("author").all()
     serializer_class = BookSerializer
+
 
     @action(detail=True, methods=['post'])
     def loan(self, request, pk=None):
@@ -50,6 +52,16 @@ class BookViewSet(viewsets.ModelViewSet):
 class MemberViewSet(viewsets.ModelViewSet):
     queryset = Member.objects.all()
     serializer_class = MemberSerializer
+
+
+    @action(detail=False, methods=['get'], url_path="top-active")
+    def top_active(self):
+        member_qs = Member.objects.annotate(
+            num_loan=Count("loans", filter=Q(is_returned=False))
+        ).order_by("num_loan")
+        members = member_qs[:5]
+        return Response(MemberLoanCountSerializer(members, many=True))
+
 
 class LoanViewSet(viewsets.ModelViewSet):
     queryset = Loan.objects.all()
