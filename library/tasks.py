@@ -1,4 +1,6 @@
-from celery import shared_task
+from celery import shared_task, app
+from django.utils import timezone
+
 from .models import Loan
 from django.core.mail import send_mail
 from django.conf import settings
@@ -18,3 +20,16 @@ def send_loan_notification(loan_id):
         )
     except Loan.DoesNotExist:
         pass
+
+@app.task
+def check_overdue_loans():
+    loan_qs = Loan.objects.filter(
+        is_returned=False,
+        due_date__lt=timezone.now()
+    )
+    for loan in loan_qs.iterator():
+        # if we want to create single task for each notificaiton
+        send_loan_notification.delay(loan.id)
+
+        # othwewise handle all notification in one task
+        # send_loan_notification(loan.id)
